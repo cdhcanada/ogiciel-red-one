@@ -1,4 +1,4 @@
-import { Product, Invoice, Category } from '../types';
+import { Product, Invoice, Category, DamagedProduct, ReturnItem, DeliveryReceipt, StockAlert } from '../types';
 
 class Database {
   private dbName = 'RedOnePOS';
@@ -42,6 +42,34 @@ class Database {
         if (!db.objectStoreNames.contains('categories')) {
           const categoriesStore = db.createObjectStore('categories', { keyPath: 'id' });
           categoriesStore.createIndex('name', 'name', { unique: true });
+        }
+
+        // Damaged products store
+        if (!db.objectStoreNames.contains('damagedProducts')) {
+          const damagedStore = db.createObjectStore('damagedProducts', { keyPath: 'id' });
+          damagedStore.createIndex('productId', 'productId', { unique: false });
+          damagedStore.createIndex('status', 'status', { unique: false });
+        }
+
+        // Returns store
+        if (!db.objectStoreNames.contains('returns')) {
+          const returnsStore = db.createObjectStore('returns', { keyPath: 'id' });
+          returnsStore.createIndex('originalInvoiceId', 'originalInvoiceId', { unique: false });
+          returnsStore.createIndex('status', 'status', { unique: false });
+        }
+
+        // Delivery receipts store
+        if (!db.objectStoreNames.contains('deliveryReceipts')) {
+          const deliveryStore = db.createObjectStore('deliveryReceipts', { keyPath: 'id' });
+          deliveryStore.createIndex('invoiceId', 'invoiceId', { unique: false });
+          deliveryStore.createIndex('status', 'status', { unique: false });
+        }
+
+        // Stock alerts store
+        if (!db.objectStoreNames.contains('stockAlerts')) {
+          const alertsStore = db.createObjectStore('stockAlerts', { keyPath: 'id' });
+          alertsStore.createIndex('productId', 'productId', { unique: false });
+          alertsStore.createIndex('alertType', 'alertType', { unique: false });
         }
       };
     });
@@ -179,6 +207,118 @@ class Database {
       product.updatedAt = new Date();
       await this.updateProduct(product);
     }
+  }
+
+  // Damaged products methods
+  async addDamagedProduct(damaged: DamagedProduct): Promise<void> {
+    await this.ensureDbConnection();
+    return new Promise((resolve, reject) => {
+      const transaction = this.db!.transaction(['damagedProducts'], 'readwrite');
+      const store = transaction.objectStore('damagedProducts');
+      const request = store.add(damaged);
+      
+      request.onsuccess = () => resolve();
+      request.onerror = () => reject(request.error);
+    });
+  }
+
+  async getAllDamagedProducts(): Promise<DamagedProduct[]> {
+    await this.ensureDbConnection();
+    return new Promise((resolve, reject) => {
+      const transaction = this.db!.transaction(['damagedProducts'], 'readonly');
+      const store = transaction.objectStore('damagedProducts');
+      const request = store.getAll();
+      
+      request.onsuccess = () => resolve(request.result || []);
+      request.onerror = () => reject(request.error);
+    });
+  }
+
+  // Returns methods
+  async addReturn(returnItem: ReturnItem): Promise<void> {
+    await this.ensureDbConnection();
+    return new Promise((resolve, reject) => {
+      const transaction = this.db!.transaction(['returns'], 'readwrite');
+      const store = transaction.objectStore('returns');
+      const request = store.add(returnItem);
+      
+      request.onsuccess = () => resolve();
+      request.onerror = () => reject(request.error);
+    });
+  }
+
+  async getAllReturns(): Promise<ReturnItem[]> {
+    await this.ensureDbConnection();
+    return new Promise((resolve, reject) => {
+      const transaction = this.db!.transaction(['returns'], 'readonly');
+      const store = transaction.objectStore('returns');
+      const request = store.getAll();
+      
+      request.onsuccess = () => resolve(request.result || []);
+      request.onerror = () => reject(request.error);
+    });
+  }
+
+  // Delivery receipts methods
+  async addDeliveryReceipt(receipt: DeliveryReceipt): Promise<void> {
+    await this.ensureDbConnection();
+    return new Promise((resolve, reject) => {
+      const transaction = this.db!.transaction(['deliveryReceipts'], 'readwrite');
+      const store = transaction.objectStore('deliveryReceipts');
+      const request = store.add(receipt);
+      
+      request.onsuccess = () => resolve();
+      request.onerror = () => reject(request.error);
+    });
+  }
+
+  async getAllDeliveryReceipts(): Promise<DeliveryReceipt[]> {
+    await this.ensureDbConnection();
+    return new Promise((resolve, reject) => {
+      const transaction = this.db!.transaction(['deliveryReceipts'], 'readonly');
+      const store = transaction.objectStore('deliveryReceipts');
+      const request = store.getAll();
+      
+      request.onsuccess = () => resolve(request.result || []);
+      request.onerror = () => reject(request.error);
+    });
+  }
+
+  // Stock alerts methods
+  async addStockAlert(alert: StockAlert): Promise<void> {
+    await this.ensureDbConnection();
+    return new Promise((resolve, reject) => {
+      const transaction = this.db!.transaction(['stockAlerts'], 'readwrite');
+      const store = transaction.objectStore('stockAlerts');
+      const request = store.add(alert);
+      
+      request.onsuccess = () => resolve();
+      request.onerror = () => reject(request.error);
+    });
+  }
+
+  async getAllStockAlerts(): Promise<StockAlert[]> {
+    await this.ensureDbConnection();
+    return new Promise((resolve, reject) => {
+      const transaction = this.db!.transaction(['stockAlerts'], 'readonly');
+      const store = transaction.objectStore('stockAlerts');
+      const request = store.getAll();
+      
+      request.onsuccess = () => resolve(request.result || []);
+      request.onerror = () => reject(request.error);
+    });
+  }
+
+  async updateStockAlert(alert: StockAlert): Promise<void> {
+    await this.ensureDbConnection();
+    return new Promise((resolve, reject) => {
+      const transaction = this.db!.transaction(['stockAlerts'], 'readwrite');
+      const store = transaction.objectStore('stockAlerts');
+      const request = store.put(alert);
+      
+      request.onsuccess = () => resolve();
+      request.onerror = () => reject(request.error);
+    });
   }
 }
 

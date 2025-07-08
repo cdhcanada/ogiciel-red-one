@@ -5,6 +5,10 @@ import Layout from './components/Layout';
 import Dashboard from './components/Dashboard';
 import POS from './components/POS';
 import ProductManagement from './components/ProductManagement';
+import DamagedProducts from './components/DamagedProducts';
+import Returns from './components/Returns';
+import DeliveryReceipts from './components/DeliveryReceipts';
+import PrintSettings from './components/PrintSettings';
 import Reports from './components/Reports';
 import Settings from './components/Settings';
 import { database } from './utils/database';
@@ -64,6 +68,10 @@ function App() {
           <Route path="/" element={<Dashboard />} />
           <Route path="/pos" element={<POS />} />
           <Route path="/products" element={<ProductManagement />} />
+          <Route path="/damaged" element={<DamagedProducts />} />
+          <Route path="/returns" element={<Returns />} />
+          <Route path="/delivery" element={<DeliveryReceipts />} />
+          <Route path="/print-settings" element={<PrintSettings />} />
           <Route path="/reports" element={<Reports />} />
           <Route path="/settings" element={<Settings />} />
         </Routes>

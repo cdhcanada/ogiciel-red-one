@@ -25,6 +25,7 @@ const ProductManagement: React.FC = () => {
   const [editingProduct, setEditingProduct] = useState<Product | null>(null);
   const [isAddingCategory, setIsAddingCategory] = useState(false);
   const [newCategoryName, setNewCategoryName] = useState('');
+  const [selectedImage, setSelectedImage] = useState<string | null>(null);
 
   const defaultCategories = [
     'إكسسوارات الهواتف',
@@ -48,6 +49,17 @@ const ProductManagement: React.FC = () => {
     category: '',
     description: ''
   });
+
+  const handleImageUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (file) {
+      const reader = new FileReader();
+      reader.onload = (e) => {
+        setSelectedImage(e.target?.result as string);
+      };
+      reader.readAsDataURL(file);
+    }
+  };
 
   const categoryIcons = {
     'إكسسوارات الهواتف': Smartphone,
@@ -115,6 +127,10 @@ const ProductManagement: React.FC = () => {
         description: formData.description
       };
 
+      if (selectedImage) {
+        productData.image = selectedImage;
+      }
+
       if (editingProduct) {
         const updatedProduct = {
           ...editingProduct,
@@ -152,6 +168,7 @@ const ProductManagement: React.FC = () => {
       category: product.category,
       description: product.description || ''
     });
+    setSelectedImage(product.image || null);
     setIsModalOpen(true);
   };
 
@@ -178,6 +195,7 @@ const ProductManagement: React.FC = () => {
       description: ''
     });
     setEditingProduct(null);
+    setSelectedImage(null);
   };
 
   const handleAddCategory = async () => {
@@ -290,7 +308,15 @@ const ProductManagement: React.FC = () => {
                     <td className="px-6 py-4 whitespace-nowrap">
                       <div className="flex items-center">
                         <div className="p-2 bg-blue-100 rounded-lg mr-3">
-                          <IconComponent className="h-5 w-5 text-blue-600" />
+                          {product.image ? (
+                            <img 
+                              src={product.image} 
+                              alt={product.name}
+                              className="h-10 w-10 object-cover rounded-lg"
+                            />
+                          ) : (
+                            <IconComponent className="h-5 w-5 text-blue-600" />
+                          )}
                         </div>
                         <div>
                           <div className="text-sm font-semibold text-gray-900">
@@ -462,6 +488,43 @@ const ProductManagement: React.FC = () => {
                   onChange={(e) => setFormData({ ...formData, quantity: e.target.value })}
                   className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
                 />
+              </div>
+
+              <div>
+                <label className="block text-sm font-semibold text-gray-700 mb-2">
+                  صورة المنتج
+                </label>
+                <div className="flex items-center space-x-4">
+                  <input
+                    type="file"
+                    accept="image/*"
+                    onChange={handleImageUpload}
+                    className="hidden"
+                    id="product-image"
+                  />
+                  <label
+                    htmlFor="product-image"
+                    className="px-4 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 cursor-pointer transition-colors"
+                  >
+                    اختيار صورة
+                  </label>
+                  {selectedImage && (
+                    <div className="flex items-center space-x-2">
+                      <img 
+                        src={selectedImage} 
+                        alt="معاينة" 
+                        className="h-12 w-12 object-cover rounded-lg border"
+                      />
+                      <button
+                        type="button"
+                        onClick={() => setSelectedImage(null)}
+                        className="text-red-600 hover:text-red-800"
+                      >
+                        حذف
+                      </button>
+                    </div>
+                  )}
+                </div>
               </div>
 
               <div>

@@ -34,6 +34,8 @@ const POS: React.FC = () => {
   const [isCheckingOut, setIsCheckingOut] = useState(false);
   const [barcodeMode, setBarcodeMode] = useState(false);
   const [selectedCategory, setSelectedCategory] = useState('');
+  const [invoiceNumber, setInvoiceNumber] = useState('');
+  const [showBarcodeScanner, setShowBarcodeScanner] = useState(false);
 
   const categories = [
     'إكسسوارات الهواتف',
@@ -59,10 +61,21 @@ const POS: React.FC = () => {
   useEffect(() => {
     loadProducts();
     setupBarcodeScanner();
+    generateInvoiceNumber();
     return () => {
       barcodeScanner.removeBarcodeListener(handleBarcodeScanned);
     };
   }, []);
+
+  const generateInvoiceNumber = () => {
+    const today = new Date();
+    const dateStr = today.getFullYear().toString().slice(-2) + 
+                   (today.getMonth() + 1).toString().padStart(2, '0') + 
+                   today.getDate().toString().padStart(2, '0');
+    const timeStr = today.getHours().toString().padStart(2, '0') + 
+                   today.getMinutes().toString().padStart(2, '0');
+    setInvoiceNumber(`${dateStr}-${timeStr}-${Math.floor(Math.random() * 1000).toString().padStart(3, '0')}`);
+  };
 
   const loadProducts = async () => {
     try {
@@ -165,7 +178,7 @@ const POS: React.FC = () => {
     setIsCheckingOut(true);
     try {
       const invoice: Invoice = {
-        id: Date.now().toString(),
+        id: invoiceNumber,
         items: cart,
         subtotal: calculateSubtotal(),
         discount,
@@ -194,6 +207,7 @@ const POS: React.FC = () => {
       setCustomerName('');
       setCustomerPhone('');
       setSearchTerm('');
+      generateInvoiceNumber();
       
       // Reload products to update quantities
       await loadProducts();
@@ -279,11 +293,22 @@ const POS: React.FC = () => {
                 onClick={() => addToCart(product)}
                 className="border border-gray-200 rounded-xl p-4 hover:shadow-lg cursor-pointer transition-all duration-200 hover:scale-105 bg-gradient-to-br from-white to-gray-50"
               >
+                {product.image && (
+                  <div className="mb-3">
+                    <img 
+                      src={product.image} 
+                      alt={product.name}
+                      className="w-full h-24 object-cover rounded-lg"
+                    />
+                  </div>
+                )}
                 <div className="flex items-center justify-between mb-3">
                   <div className="flex items-center">
-                    <div className="p-2 bg-blue-100 rounded-lg mr-3">
-                      <IconComponent className="h-5 w-5 text-blue-600" />
-                    </div>
+                    {!product.image && (
+                      <div className="p-2 bg-blue-100 rounded-lg mr-3">
+                        <IconComponent className="h-5 w-5 text-blue-600" />
+                      </div>
+                    )}
                     <div>
                       <h3 className="font-semibold text-gray-900 text-sm">{product.name}</h3>
                       <p className="text-xs text-gray-500">{product.category}</p>
@@ -322,6 +347,13 @@ const POS: React.FC = () => {
         </div>
 
         {/* Cart Items */}
+        <div className="mb-4 p-3 bg-blue-50 rounded-xl border border-blue-200">
+          <div className="flex items-center justify-between">
+            <span className="text-sm font-semibold text-blue-800">رقم الفاتورة:</span>
+            <span className="text-sm font-mono text-blue-900">{invoiceNumber}</span>
+          </div>
+        </div>
+
         <div className="flex-1 overflow-y-auto mb-6">
           {cart.length === 0 ? (
             <div className="text-center text-gray-500 py-12">
