@@ -11,19 +11,38 @@ import {
   Smartphone,
   Headphones,
   Battery,
-  Cable
+  Cable,
+  Save,
+  FolderOpen,
+  HardDrive,
+  Cloud,
+  Filter,
+  Eye,
+  Trash2
 } from 'lucide-react';
 import { database } from '../utils/database';
 import { Invoice, Product } from '../types';
 import { format, startOfDay, endOfDay, subDays } from 'date-fns';
 
+interface SalesRecord {
+  id: string;
+  invoice: Invoice;
+  savedAt: Date;
+  storageLocation: 'local' | 'download' | 'cloud';
+}
+
 const Reports: React.FC = () => {
   const [invoices, setInvoices] = useState<Invoice[]>([]);
   const [products, setProducts] = useState<Product[]>([]);
+  const [salesRecords, setSalesRecords] = useState<SalesRecord[]>([]);
   const [dateRange, setDateRange] = useState({
     start: format(subDays(new Date(), 30), 'yyyy-MM-dd'),
     end: format(new Date(), 'yyyy-MM-dd')
   });
+  const [storageLocation, setStorageLocation] = useState<'local' | 'download' | 'cloud'>('local');
+  const [selectedCategory, setSelectedCategory] = useState('');
+  const [paymentMethodFilter, setPaymentMethodFilter] = useState('');
+  const [showSalesHistory, setShowSalesHistory] = useState(false);
 
   const categoryIcons = {
     'إكسسوارات الهواتف': Smartphone,
@@ -35,6 +54,7 @@ const Reports: React.FC = () => {
 
   useEffect(() => {
     loadData();
+    loadSalesRecords();
   }, []);
 
   const loadData = async () => {
@@ -52,11 +72,55 @@ const Reports: React.FC = () => {
     }
   };
 
+  const loadSalesRecords = () => {
+    const saved = localStorage.getItem('salesRecords');
+    if (saved) {
+      setSalesRecords(JSON.parse(saved));
+    }
+  };
+
+  const saveSalesRecord = (invoice: Invoice) => {
+    const record: SalesRecord = {
+      id: Date.now().toString(),
+      invoice,
+      savedAt: new Date(),
+      storageLocation
+    };
+
+    const updatedRecords = [...salesRecords, record];
+    setSalesRecords(updatedRecords);
+    localStorage.setItem('salesRecords', JSON.stringify(updatedRecords));
+
+    if (storageLocation === 'download') {
+      downloadSalesRecord(record);
+    }
+  };
+
+  const downloadSalesRecord = (record: SalesRecord) => {
+    const dataStr = JSON.stringify(record, null, 2);
+    const dataUri = 'data:application/json;charset=utf-8,'+ encodeURIComponent(dataStr);
+    
+    const exportFileDefaultName = `مبيعة-${record.invoice.id.slice(-8)}-${format(record.savedAt, 'yyyy-MM-dd')}.json`;
+    
+    const linkElement = document.createElement('a');
+    linkElement.setAttribute('href', dataUri);
+    linkElement.setAttribute('download', exportFileDefaultName);
+    linkElement.click();
+  };
+
   const filteredInvoices = (Array.isArray(invoices) ? invoices : []).filter(invoice => {
     const invoiceDate = new Date(invoice.createdAt);
     const startDate = startOfDay(new Date(dateRange.start));
     const endDate = endOfDay(new Date(dateRange.end));
-    return invoiceDate >= startDate && invoiceDate <= endDate;
+    const dateMatch = invoiceDate >= startDate && invoiceDate <= endDate;
+    
+    const categoryMatch = selectedCategory === '' || 
+      invoice.items.some(item => item.product.category === selectedCategory);
+    
+    const paymentMatch = paymentMethodFilter === '' || 
+      invoice.paymentMethod === paymentMethodFilter;
+    
+    return dateMatch && categoryMatch && paymentMatch;
   });
 
   const calculateStats = () => {
@@ -71,12 +135,20 @@ const Reports: React.FC = () => {
       return sum + profit;
     }, 0);
 
+    // إحصائيات طرق الدفع
+    const paymentStats = {
+      cash: filteredInvoices.filter(inv => inv.paymentMethod === 'cash').length,
+      card: filteredInvoices.filter(inv => inv.paymentMethod === 'card').length,
+      transfer: filteredInvoices.filter(inv => inv.paymentMethod === 'transfer').length
+    };
+
     return {
       totalSales,
       totalInvoices,
       avgInvoiceValue,
       totalDiscount,
-      totalProfit
+      totalProfit,
+      paymentStats
     };
   };
 
@@ -157,27 +229,26 @@ const Reports: React.FC = () => {
     return (Array.isArray(products) ? products : []).filter(product => product.quantity <= 5);
   };
 
-  const stats = calculateStats();
-  const topProducts = getTopProducts();
-  const categorySales = getCategorySales();
-  const dailySales = getDailySales();
-  const lowStockProducts = getLowStockProducts();
-
   const exportReport = () => {
     const reportData = {
       period: `${dateRange.start} إلى ${dateRange.end}`,
-      stats,
-      topProducts,
-      categorySales,
-      dailySales,
-      lowStockProducts,
+      filters: {
+        category: selectedCategory || 'جميع الفئات',
+        paymentMethod: paymentMethodFilter || 'جميع طرق الدفع'
+      },
+      stats: calculateStats(),
+      topProducts: getTopProducts(),
+      categorySales: getCategorySales(),
+      dailySales: getDailySales(),
+      lowStockProducts: getLowStockProducts(),
+      detailedInvoices: filteredInvoices,
       generatedAt: new Date().toISOString()
     };
 
     const dataStr = JSON.stringify(reportData, null, 2);
     const dataUri = 'data:application/json;charset=utf-8,'+ encodeURIComponent(dataStr);
     
-    const exportFileDefaultName = `تقرير-المبيعات-${format(new Date(), 'yyyy-MM-dd')}.json`;
+    const exportFileDefaultName = `تقرير-شامل-${format(new Date(), 'yyyy-MM-dd-HH-mm')}.json`;
     
     const linkElement = document.createElement('a');
     linkElement.setAttribute('href', dataUri);
@@ -185,27 +256,128 @@ const Reports: React.FC = () => {
     linkElement.click();
   };
 
+  const exportExcelFormat = () => {
+    let csvContent = "data:text/csv;charset=utf-8,\uFEFF";
+    
+    // Headers
+    csvContent += "رقم الفاتورة,التاريخ,العميل,طريقة الدفع,المجموع الفرعي,الخصم,الإجمالي,المنتجات\n";
+    
+    // Data
+    filteredInvoices.forEach(invoice => {
+      const products = invoice.items.map(item => `${item.product.name} (${item.quantity})`).join('; ');
+      csvContent += `${invoice.id.slice(-8)},${format(invoice.createdAt, 'dd/MM/yyyy HH:mm')},${invoice.customerName || 'غير محدد'},${invoice.paymentMethod === 'cash' ? 'نقداً' : invoice.paymentMethod === 'card' ? 'بطاقة' : 'تحويل'},${invoice.subtotal},${invoice.discount},${invoice.total},"${products}"\n`;
+    });
+
+    const encodedUri = encodeURI(csvContent);
+    const link = document.createElement("a");
+    link.setAttribute("href", encodedUri);
+    link.setAttribute("download", `تقرير-المبيعات-${format(new Date(), 'yyyy-MM-dd')}.csv`);
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  };
+
+  const deleteSalesRecord = (recordId: string) => {
+    if (window.confirm('هل أنت متأكد من حذف هذا السجل؟')) {
+      const updatedRecords = salesRecords.filter(record => record.id !== recordId);
+      setSalesRecords(updatedRecords);
+      localStorage.setItem('salesRecords', JSON.stringify(updatedRecords));
+    }
+  };
+
+  const stats = calculateStats();
+  const topProducts = getTopProducts();
+  const categorySales = getCategorySales();
+  const dailySales = getDailySales();
+  const lowStockProducts = getLowStockProducts();
+
   return (
     <div className="space-y-8">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-3xl font-bold text-gray-900">التقارير والإحصائيات</h1>
-          <p className="text-gray-600 mt-1">تحليل شامل لأداء المبيعات والمخزون</p>
+          <h1 className="text-3xl font-bold text-gray-900">التقارير والإحصائيات المتقدمة</h1>
+          <p className="text-gray-600 mt-1">تحليل شامل ومتقدم لأداء المبيعات والمخزون</p>
         </div>
-        <button
-          onClick={exportReport}
-          className="bg-gradient-to-r from-green-500 to-green-600 text-white px-6 py-3 rounded-xl hover:from-green-600 hover:to-green-700 flex items-center space-x-2 shadow-lg transition-all duration-200 hover:shadow-xl"
-        >
-          <Download className="h-5 w-5" />
-          <span>تصدير التقرير</span>
-        </button>
+        <div className="flex space-x-3">
+          <button
+            onClick={() => setShowSalesHistory(!showSalesHistory)}
+            className="bg-gradient-to-r from-purple-500 to-purple-600 text-white px-6 py-3 rounded-xl hover:from-purple-600 hover:to-purple-700 flex items-center space-x-2 shadow-lg transition-all duration-200 hover:shadow-xl"
+          >
+            <Eye className="h-5 w-5" />
+            <span>سجل المبيعات</span>
+          </button>
+          <button
+            onClick={exportExcelFormat}
+            className="bg-gradient-to-r from-blue-500 to-blue-600 text-white px-6 py-3 rounded-xl hover:from-blue-600 hover:to-blue-700 flex items-center space-x-2 shadow-lg transition-all duration-200 hover:shadow-xl"
+          >
+            <FileText className="h-5 w-5" />
+            <span>تصدير Excel</span>
+          </button>
+          <button
+            onClick={exportReport}
+            className="bg-gradient-to-r from-green-500 to-green-600 text-white px-6 py-3 rounded-xl hover:from-green-600 hover:to-green-700 flex items-center space-x-2 shadow-lg transition-all duration-200 hover:shadow-xl"
+          >
+            <Download className="h-5 w-5" />
+            <span>تصدير شامل</span>
+          </button>
+        </div>
       </div>
 
-      {/* Date Range Filter */}
+      {/* Storage Location Settings */}
       <div className="bg-white p-6 rounded-2xl shadow-lg border border-gray-100">
-        <div className="flex items-center space-x-4">
-          <Calendar className="h-6 w-6 text-blue-500" />
-          <div className="flex items-center space-x-4">
+        <div className="flex items-center mb-4">
+          <HardDrive className="h-6 w-6 text-blue-500 mr-3" />
+          <h3 className="text-lg font-semibold text-gray-900">إعدادات حفظ المبيعات</h3>
+        </div>
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          <button
+            onClick={() => setStorageLocation('local')}
+            className={`p-4 rounded-xl border-2 transition-all ${
+              storageLocation === 'local' 
+                ? 'border-blue-500 bg-blue-50' 
+                : 'border-gray-200 hover:border-gray-300'
+            }`}
+          >
+            <HardDrive className="h-8 w-8 mx-auto mb-2 text-blue-500" />
+            <p className="font-semibold">التخزين المحلي</p>
+            <p className="text-sm text-gray-600">حفظ في المتصفح</p>
+          </button>
+          <button
+            onClick={() => setStorageLocation('download')}
+            className={`p-4 rounded-xl border-2 transition-all ${
+              storageLocation === 'download' 
+                ? 'border-green-500 bg-green-50' 
+                : 'border-gray-200 hover:border-gray-300'
+            }`}
+          >
+            <Download className="h-8 w-8 mx-auto mb-2 text-green-500" />
+            <p className="font-semibold">التحميل التلقائي</p>
+            <p className="text-sm text-gray-600">تحميل ملف لكل مبيعة</p>
+          </button>
+          <button
+            onClick={() => setStorageLocation('cloud')}
+            className={`p-4 rounded-xl border-2 transition-all ${
+              storageLocation === 'cloud' 
+                ? 'border-purple-500 bg-purple-50' 
+                : 'border-gray-200 hover:border-gray-300'
+            }`}
+          >
+            <Cloud className="h-8 w-8 mx-auto mb-2 text-purple-500" />
+            <p className="font-semibold">التخزين السحابي</p>
+            <p className="text-sm text-gray-600">قريباً</p>
+          </button>
+        </div>
+      </div>
+
+      {/* Advanced Filters */}
+      <div className="bg-white p-6 rounded-2xl shadow-lg border border-gray-100">
+        <div className="flex items-center mb-4">
+          <Filter className="h-6 w-6 text-blue-500 mr-3" />
+          <h3 className="text-lg font-semibold text-gray-900">فلاتر متقدمة</h3>
+        </div>
+        <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
+          <div className="flex items-center space-x-2">
+            <Calendar className="h-5 w-5 text-gray-400" />
             <div className="flex items-center space-x-2">
               <label className="text-sm font-semibold text-gray-700">من:</label>
               <input
@@ -215,6 +387,8 @@ const Reports: React.FC = () => {
                 className="px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
               />
             </div>
+          </div>
+          <div className="flex items-center space-x-2">
             <div className="flex items-center space-x-2">
               <label className="text-sm font-semibold text-gray-700">إلى:</label>
               <input
@@ -225,11 +399,34 @@ const Reports: React.FC = () => {
               />
             </div>
           </div>
+          <select
+            value={selectedCategory}
+            onChange={(e) => setSelectedCategory(e.target.value)}
+            className="px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+          >
+            <option value="">جميع الفئات</option>
+            {Array.from(new Set(products.map(p => p.category))).map(category => (
+              <option key={category} value={category}>{category}</option>
+            ))}
+          </select>
+          <select
+            value={paymentMethodFilter}
+            onChange={(e) => setPaymentMethodFilter(e.target.value)}
+            className="px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+          >
+            <option value="">جميع طرق الدفع</option>
+            <option value="cash">نقداً</option>
+            <option value="card">بطاقة</option>
+            <option value="transfer">تحويل</option>
+          </select>
+          <div className="text-sm text-gray-600 flex items-center">
+            <span>النتائج: {filteredInvoices.length} فاتورة</span>
+          </div>
         </div>
       </div>
 
-      {/* Stats Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-6">
+      {/* Enhanced Stats Cards */}
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-6 gap-6">
         <div className="bg-gradient-to-br from-green-50 to-green-100 p-6 rounded-2xl shadow-lg border border-green-200">
           <div className="flex items-center justify-between">
             <div>
@@ -289,8 +486,87 @@ const Reports: React.FC = () => {
             </div>
           </div>
         </div>
+
+        <div className="bg-gradient-to-br from-indigo-50 to-indigo-100 p-6 rounded-2xl shadow-lg border border-indigo-200">
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="text-sm text-indigo-600 font-medium">طرق الدفع</p>
+              <div className="text-sm text-indigo-800">
+                <div>نقداً: {stats.paymentStats.cash}</div>
+                <div>بطاقة: {stats.paymentStats.card}</div>
+                <div>تحويل: {stats.paymentStats.transfer}</div>
+              </div>
+            </div>
+            <div className="p-3 bg-indigo-500 rounded-xl">
+              <DollarSign className="h-6 w-6 text-white" />
+            </div>
+          </div>
+        </div>
       </div>
 
+      {/* Sales History Modal */}
+      {showSalesHistory && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-2xl p-6 w-full max-w-4xl max-h-[80vh] overflow-y-auto">
+            <div className="flex items-center justify-between mb-6">
+              <h2 className="text-xl font-bold text-gray-900">سجل المبيعات المحفوظة</h2>
+              <button
+                onClick={() => setShowSalesHistory(false)}
+                className="text-gray-400 hover:text-gray-600 p-2 hover:bg-gray-100 rounded-lg transition-colors"
+              >
+                ×
+              </button>
+            </div>
+
+            <div className="space-y-4">
+              {salesRecords.length > 0 ? (
+                salesRecords.map((record) => (
+                  <div key={record.id} className="border border-gray-200 rounded-xl p-4 hover:bg-gray-50 transition-colors">
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <p className="font-semibold text-gray-900">
+                          فاتورة #{record.invoice.id.slice(-8)}
+                        </p>
+                        <p className="text-sm text-gray-500">
+                          حُفظت في: {format(new Date(record.savedAt), 'dd/MM/yyyy HH:mm')}
+                        </p>
+                        <p className="text-sm text-gray-500">
+                          المكان: {record.storageLocation === 'local' ? 'محلي' : 
+                                   record.storageLocation === 'download' ? 'تحميل' : 'سحابي'}
+                        </p>
+                      </div>
+                      <div className="flex items-center space-x-2">
+                        <span className="text-lg font-bold text-green-600">
+                          {record.invoice.total.toLocaleString()} د.ج
+                        </span>
+                        <button
+                          onClick={() => downloadSalesRecord(record)}
+                          className="p-2 text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
+                        >
+                          <Download className="h-4 w-4" />
+                        </button>
+                        <button
+                          onClick={() => deleteSalesRecord(record.id)}
+                          className="p-2 text-red-600 hover:bg-red-50 rounded-lg transition-colors"
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                ))
+              ) : (
+                <div className="text-center text-gray-500 py-8">
+                  <Save className="h-12 w-12 mx-auto mb-3 text-gray-300" />
+                  <p>لا توجد مبيعات محفوظة</p>
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Rest of the existing components... */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
         {/* Top Products */}
         <div className="bg-white rounded-2xl shadow-xl border border-gray-100">

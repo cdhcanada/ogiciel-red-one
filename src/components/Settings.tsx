@@ -348,6 +348,49 @@ const Settings: React.FC = () => {
         </div>
       </div>
 
+      {/* Mobile Installation Guide */}
+      <div className="bg-white rounded-2xl shadow-xl p-8 border border-gray-100">
+        <div className="flex items-center mb-6">
+          <div className="p-3 bg-orange-100 rounded-xl mr-4">
+            <Smartphone className="h-6 w-6 text-orange-600" />
+          </div>
+          <div>
+            <h2 className="text-xl font-bold text-gray-900">تشغيل النظام على الهاتف</h2>
+            <p className="text-gray-600">خطوات تشغيل النظام على الهاتف المحمول</p>
+          </div>
+        </div>
+        
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+          <div className="p-6 bg-gradient-to-br from-blue-50 to-indigo-50 rounded-xl border border-blue-200">
+            <h3 className="font-bold text-blue-900 mb-3">للأندرويد (Android)</h3>
+            <ol className="text-sm text-blue-800 space-y-2">
+              <li>1. افتح متصفح Chrome</li>
+              <li>2. ادخل على الرابط</li>
+              <li>3. اضغط على القائمة (⋮)</li>
+              <li>4. اختر "إضافة إلى الشاشة الرئيسية"</li>
+              <li>5. اضغط "إضافة"</li>
+            </ol>
+          </div>
+          
+          <div className="p-6 bg-gradient-to-br from-green-50 to-emerald-50 rounded-xl border border-green-200">
+            <h3 className="font-bold text-green-900 mb-3">للآيفون (iPhone)</h3>
+            <ol className="text-sm text-green-800 space-y-2">
+              <li>1. افتح متصفح Safari</li>
+              <li>2. ادخل على الرابط</li>
+              <li>3. اضغط على زر المشاركة (□↗)</li>
+              <li>4. اختر "إضافة إلى الشاشة الرئيسية"</li>
+              <li>5. اضغط "إضافة"</li>
+            </ol>
+          </div>
+        </div>
+        
+        <div className="mt-6 p-4 bg-yellow-50 border border-yellow-200 rounded-xl">
+          <p className="text-yellow-800 text-sm">
+            <strong>ملاحظة:</strong> بعد إضافة النظام للشاشة الرئيسية، سيعمل مثل تطبيق عادي ولن تحتاج للإنترنت للاستخدام.
+          </p>
+        </div>
+      </div>
+
       {/* System Information */}
       <div className="bg-white rounded-2xl shadow-xl p-8 border border-gray-100">
         <div className="flex items-center mb-6">

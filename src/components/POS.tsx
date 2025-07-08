@@ -186,7 +186,7 @@ const POS: React.FC = () => {
       }
 
       // Generate PDF
-      generateInvoicePDF(invoice);
+      await generateInvoicePDF(invoice);
 
       // Reset form
       setCart([]);
